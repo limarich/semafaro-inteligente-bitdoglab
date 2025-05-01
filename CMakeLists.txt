@@ -37,7 +37,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(${PROJECT_NAME} semafaro-inteligente-raspberry-pico-w.c )
+add_executable(${PROJECT_NAME} semafaro-inteligente-raspberry-pico-w.c lib/buzzer.c)
 
 pico_set_program_name(${PROJECT_NAME} "semafaro-inteligente-raspberry-pico-w")
 pico_set_program_version(${PROJECT_NAME}  "0.1")
@@ -62,7 +62,7 @@ target_include_directories(${PROJECT_NAME}  PRIVATE
 
 # Add any user requested libraries
 target_link_libraries(${PROJECT_NAME}  
-        
+        hardware_pwm
         )
 
 pico_add_extra_outputs(${PROJECT_NAME} )
