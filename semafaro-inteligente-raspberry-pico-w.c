@@ -20,7 +20,7 @@
 #define DEBOUNCE_MS 200 // intervalo minimo de 200ms para o debounce
 #define BUZZER_A 10
 #define BUZZER_B 21
-#define BUZZER_FREQUENCY 1000
+#define BUZZER_FREQUENCY 1500
 #define I2C_PORT i2c1
 #define I2C_SDA 14
 #define I2C_SCL 15
@@ -38,6 +38,9 @@ typedef enum
 volatile traffic_light_state light_state = GREEN_LIGHT;
 // controla se o buzzer já tocou após mudar
 volatile bool buzzer_already_played = false;
+// controla a luz amarela piscando
+volatile bool night_toggle = false;
+
 // variaveis relacionadas a matriz de led
 PIO pio;
 uint sm;
@@ -58,6 +61,8 @@ void vTrafficLightControllerTask(void *pvParameters)
     {
         if (light_state == NIGHT_MODE)
         {
+            night_toggle = !night_toggle;
+
             vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
             continue;
         }
@@ -118,10 +123,8 @@ void vLedTask(void *pvParameters)
             break;
 
         case NIGHT_MODE:
-            toggle = !toggle;
-            gpio_put(ledR, toggle);
-            gpio_put(ledG, toggle);
-            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+            gpio_put(ledR, night_toggle);
+            gpio_put(ledG, night_toggle);
             break;
 
         default:
@@ -146,6 +149,7 @@ void vTrafficLightTask(void *pvParameters)
         {
         case GREEN_LIGHT:
             draw_traffic_light(pio, sm, GREEN);
+
             break;
 
         case YELLOW_LIGHT:
@@ -157,9 +161,7 @@ void vTrafficLightTask(void *pvParameters)
             break;
 
         case NIGHT_MODE:
-            toggle = !toggle;
-            draw_traffic_light(pio, sm, toggle ? YELLOW : BLACK);
-            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+            draw_traffic_light(pio, sm, night_toggle ? YELLOW : BLACK);
             break;
 
         default:
@@ -181,7 +183,7 @@ void vBuzzerTask(void *pvParameters)
         if (light_state == NIGHT_MODE)
         {
             buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 200);
-            vTaskDelay(pdMS_TO_TICKS(2800)); // 3s total
+            vTaskDelay(pdMS_TO_TICKS(1800)); // 2s total
             continue;
         }
 
@@ -315,7 +317,7 @@ int main()
 
     xTaskCreate(vTrafficLightControllerTask, "Task de gerenciamento do estado global", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
     xTaskCreate(vLedTask, "Task do LED RGB", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
-    xTaskCreate(vBuzzerTask, "Task de Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+    // xTaskCreate(vBuzzerTask, "Task de Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
     xTaskCreate(vTrafficLightTask, "Task do Semafaro com a matrix de led", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
     xTaskCreate(vButtonTask, "Leitura Botão", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
     xTaskCreate(vDisplayAnimationTask, "Desenha no display", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
