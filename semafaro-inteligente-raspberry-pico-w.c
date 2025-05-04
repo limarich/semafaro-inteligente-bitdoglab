@@ -9,6 +9,9 @@
 #include "lib/buzzer.h"
 #include "pio_matrix.pio.h"
 #include "lib/leds.h"
+#include "hardware/i2c.h"
+#include "lib/ssd1306.h"
+#include "lib/font.h"
 
 #define ledR 13          // pino do led vermelho
 #define ledG 11          // pino do led verde
@@ -17,16 +20,72 @@
 #define DEBOUNCE_MS 200 // intervalo minimo de 200ms para o debounce
 #define BUZZER_A 10
 #define BUZZER_B 21
-#define BUZZER_FREQUENCY 850
+#define BUZZER_FREQUENCY 1000
+#define I2C_PORT i2c1
+#define I2C_SDA 14
+#define I2C_SCL 15
+#define endereco 0x3C
 
 // controle do modo do semáfaro
-volatile bool night_mode = false;
+typedef enum
+{
+    GREEN_LIGHT,
+    YELLOW_LIGHT,
+    RED_LIGHT,
+    NIGHT_MODE
+} traffic_light_state;
+
+volatile traffic_light_state light_state = GREEN_LIGHT;
+// controla se o buzzer já tocou após mudar
+volatile bool buzzer_already_played = false;
 // variaveis relacionadas a matriz de led
 PIO pio;
 uint sm;
+// variavel do display
+ssd1306_t ssd; // Inicializa a estrutura do display
 
 // inicializacao da PIO
 void PIO_setup(PIO *pio, uint *sm);
+// inicializa o display
+void ssd_setup();
+
+// controla a cor do semáfaro
+void vTrafficLightControllerTask(void *pvParameters)
+{
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+
+    while (1)
+    {
+        if (light_state == NIGHT_MODE)
+        {
+            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+            continue;
+        }
+
+        light_state = GREEN_LIGHT;
+        buzzer_already_played = false;
+
+        for (int i = 0; i < 12 && light_state != NIGHT_MODE; i++)
+            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
+
+        if (light_state == NIGHT_MODE)
+            continue;
+
+        light_state = YELLOW_LIGHT;
+        buzzer_already_played = false;
+
+        for (int i = 0; i < 6 && light_state != NIGHT_MODE; i++)
+            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
+
+        if (light_state == NIGHT_MODE)
+            continue;
+
+        light_state = RED_LIGHT;
+        buzzer_already_played = false;
+        for (int i = 0; i < 16 && light_state != NIGHT_MODE; i++)
+            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
+    }
+}
 
 // controla o led RGB
 void vLedTask(void *pvParameters)
@@ -37,41 +96,41 @@ void vLedTask(void *pvParameters)
     gpio_set_dir(ledG, GPIO_OUT);
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
+    static bool toggle = false;
 
     while (1)
     {
-        if (!night_mode)
+        switch (light_state)
         {
-            // Verde por 3 segundos, em etapas de 250ms
+        case GREEN_LIGHT:
             gpio_put(ledR, false);
             gpio_put(ledG, true);
-            for (int i = 0; i < 12 && !night_mode; i++)
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
+            break;
 
-            // Amarelo por 1.5 segundos
+        case YELLOW_LIGHT:
             gpio_put(ledR, true);
             gpio_put(ledG, true);
-            for (int i = 0; i < 6 && !night_mode; i++)
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
+            break;
 
-            // Vermelho por 4 segundos
+        case RED_LIGHT:
+            gpio_put(ledR, true);
             gpio_put(ledG, false);
-            gpio_put(ledR, true);
-            for (int i = 0; i < 16 && !night_mode; i++)
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
-        }
-        else
-        {
-            // Amarelo aceso por 500ms
-            gpio_put(ledR, true);
-            gpio_put(ledG, true);
-            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(500));
+            break;
 
-            // Amarelo apagado por 500ms
+        case NIGHT_MODE:
+            toggle = !toggle;
+            gpio_put(ledR, toggle);
+            gpio_put(ledG, toggle);
+            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+            break;
+
+        default:
             gpio_put(ledR, false);
             gpio_put(ledG, false);
-            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(500));
+            break;
         }
+
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(500));
     }
 }
 
@@ -79,40 +138,36 @@ void vLedTask(void *pvParameters)
 void vTrafficLightTask(void *pvParameters)
 {
     TickType_t xLastWakeTime = xTaskGetTickCount();
+    static bool toggle = false;
 
     while (1)
     {
-        if (!night_mode)
+        switch (light_state)
         {
-            // Verde por 3 segundos, checando a cada 250ms
-            for (int i = 0; i < 12 && !night_mode; i++)
-            {
-                draw_traffic_light(pio, sm, GREEN);
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
-            }
+        case GREEN_LIGHT:
+            draw_traffic_light(pio, sm, GREEN);
+            break;
 
-            // Amarelo por 1.5 segundos
-            for (int i = 0; i < 6 && !night_mode; i++)
-            {
-                draw_traffic_light(pio, sm, YELLOW);
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
-            }
-
-            // Vermelho por 4 segundos
-            for (int i = 0; i < 16 && !night_mode; i++)
-            {
-                draw_traffic_light(pio, sm, RED);
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
-            }
-        }
-        else
-        {
+        case YELLOW_LIGHT:
             draw_traffic_light(pio, sm, YELLOW);
-            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(500));
+            break;
 
+        case RED_LIGHT:
+            draw_traffic_light(pio, sm, RED);
+            break;
+
+        case NIGHT_MODE:
+            toggle = !toggle;
+            draw_traffic_light(pio, sm, toggle ? YELLOW : BLACK);
+            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(1000));
+            break;
+
+        default:
             draw_traffic_light(pio, sm, BLACK);
-            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(500));
+            break;
         }
+
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(500));
     }
 }
 
@@ -121,40 +176,53 @@ void vBuzzerTask(void *pvParameters)
 {
     initialization_buzzers(BUZZER_A, BUZZER_B);
 
-    TickType_t xLastWakeTime = xTaskGetTickCount();
-
     while (1)
     {
-        if (!night_mode)
+        if (light_state == NIGHT_MODE)
         {
-            // Verde: beep curto (1s)
-            buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 1000);
-            for (int i = 0; i < 8 && !night_mode; i++) // 2s / 250ms
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
-
-            // Amarelo: dois beeps curtos com pausa
-            buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 100);
-            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(200));
-
-            if (night_mode)
-                continue; // checa antes do segundo beep
-
-            buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 100);
-            for (int i = 0; i < 5 && !night_mode; i++) // restante do ciclo ~1.25s
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
-
-            // Vermelho: beep longo (500ms) e silêncio por 3.5s
-            buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 500);
-            for (int i = 0; i < 14 && !night_mode; i++) // 3.5s / 250ms
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
-        }
-        else
-        {
-            // Modo noturno: beep curto a cada 2s
             buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 200);
-            for (int i = 0; i < 8 && night_mode; i++) // 2s
-                vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(250));
+            vTaskDelay(pdMS_TO_TICKS(2800)); // 3s total
+            continue;
         }
+
+        switch (light_state)
+        {
+        case GREEN_LIGHT:
+            if (!buzzer_already_played)
+            {
+                buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 1000);
+                buzzer_already_played = true;
+            }
+            break;
+
+        case YELLOW_LIGHT:
+            if (!buzzer_already_played)
+            {
+                // Aguarda 100ms para garantir que a luz amarela já esteja visível
+                vTaskDelay(pdMS_TO_TICKS(100));
+                buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 50);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                buzzer_already_played = false;
+            }
+            break;
+
+        case RED_LIGHT:
+            if (!buzzer_already_played)
+            {
+                vTaskDelay(pdMS_TO_TICKS(100));
+
+                // Toca beep de 500ms, espera 1.5s e repete enquanto estiver no vermelho
+                buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 500);
+                vTaskDelay(pdMS_TO_TICKS(1500));
+                buzzer_already_played = true;
+            }
+            break;
+
+        default:
+            break;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(250));
     }
 }
 
@@ -169,16 +237,67 @@ void vButtonTask(void *pvParameters)
 
         if (!current_state && last_button_state) // botão foi pressionado
         {
-            night_mode = !night_mode;
-            printf("Modo alterado: %d\n", night_mode);
+            if (light_state == NIGHT_MODE)
+            {
+                light_state = GREEN_LIGHT;
+                printf("Modo alterado: Normal\n");
+            }
+            else
+            {
+                light_state = NIGHT_MODE;
+                printf("Modo alterado: Noturno\n");
+            }
+
             vTaskDelay(pdMS_TO_TICKS(200)); // debounce
         }
 
         last_button_state = current_state;
-        vTaskDelay(pdMS_TO_TICKS(10)); // frequência de varredura
+        vTaskDelay(pdMS_TO_TICKS(10)); // polling rápido
     }
 }
 
+// Task para desenhar no display
+void vDisplayAnimationTask(void *pvParameters)
+{
+    float arm_rotate = 0;
+    float leg_rotate = 0;
+    int arm_factor = 2;
+    int leg_factor = 3;
+
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    while (1)
+    {
+
+        ssd1306_fill(&ssd, false);
+        // cabeça
+        ssd1306_rect(&ssd, 10, (WIDTH - 10) / 2, 10, 10, true, true);
+        // tronco
+        ssd1306_rect(&ssd, 20, (WIDTH - 10) / 2 + 2, 6, 20, true, true);
+        // braço 1
+        ssd1306_rotated_rect_angle(&ssd, (WIDTH - 10) / 2 + 10, 26, 10, 5, 45.0 + arm_rotate, true);
+        // braço 2
+        ssd1306_rotated_rect_angle(&ssd, (WIDTH - 10) / 2, 26, 10, 5, 135 - arm_rotate, true);
+        // perna 1
+        ssd1306_rotated_rect_angle(&ssd, (WIDTH - 10) / 2 + 3, 40, 15, 5, 90.0 + leg_rotate, true);
+        // perna 2
+        ssd1306_rotated_rect_angle(&ssd, (WIDTH - 10) / 2 + 6, 40, 15, 5, 90.0 - leg_rotate, true);
+
+        ssd1306_draw_string(&ssd, "PODE SEGUIR", 0, 0);
+
+        ssd1306_send_data(&ssd);
+
+        arm_rotate += arm_factor;
+        leg_rotate += leg_factor;
+        if (arm_rotate < 0)
+            arm_factor *= -1;
+        if (arm_rotate > 45)
+            arm_factor *= -1;
+        if (leg_rotate < 0)
+            leg_factor *= -1;
+        if (leg_rotate > 45)
+            leg_factor *= -1;
+    }
+}
 int main()
 {
 
@@ -186,16 +305,20 @@ int main()
 
     // inicializa a PIO
     PIO_setup(&pio, &sm);
+    // inicializa o display
+    ssd_setup();
 
     // configuração do butão A
     gpio_init(BUTTON_A);
     gpio_set_dir(BUTTON_A, GPIO_IN);
     gpio_pull_up(BUTTON_A);
 
+    xTaskCreate(vTrafficLightControllerTask, "Task de gerenciamento do estado global", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
     xTaskCreate(vLedTask, "Task do LED RGB", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
-    // xTaskCreate(vBuzzerTask, "Task de Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+    xTaskCreate(vBuzzerTask, "Task de Buzzer", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
     xTaskCreate(vTrafficLightTask, "Task do Semafaro com a matrix de led", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
     xTaskCreate(vButtonTask, "Leitura Botão", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+    xTaskCreate(vDisplayAnimationTask, "Desenha no display", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
     vTaskStartScheduler();
     panic_unsupported();
@@ -208,4 +331,22 @@ void PIO_setup(PIO *pio, uint *sm)
     uint offset = pio_add_program(*pio, &pio_matrix_program);
     *sm = pio_claim_unused_sm(*pio, true);
     pio_matrix_program_init(*pio, *sm, offset, LED_PIN);
+}
+
+void ssd_setup()
+{
+    // I2C Initialisation. Using it at 400Khz.
+    i2c_init(I2C_PORT, 400 * 1000);
+
+    gpio_set_function(I2C_SDA, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
+    gpio_set_function(I2C_SCL, GPIO_FUNC_I2C);                    // Set the GPIO pin function to I2C
+    gpio_pull_up(I2C_SDA);                                        // Pull up the data line
+    gpio_pull_up(I2C_SCL);                                        // Pull up the clock line
+    ssd1306_init(&ssd, WIDTH, HEIGHT, false, endereco, I2C_PORT); // Inicializa o display
+    ssd1306_config(&ssd);                                         // Configura o display
+    ssd1306_send_data(&ssd);                                      // Envia os dados para o display
+
+    // Limpa o display. O display inicia com todos os pixels apagados.
+    ssd1306_fill(&ssd, false);
+    ssd1306_send_data(&ssd);
 }
