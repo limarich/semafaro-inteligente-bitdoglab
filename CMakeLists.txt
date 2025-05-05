@@ -37,7 +37,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(${PROJECT_NAME} semafaro-inteligente-raspberry-pico-w.c lib/buzzer.c lib/leds.c)
+add_executable(${PROJECT_NAME} semafaro-inteligente-raspberry-pico-w.c lib/buzzer.c lib/leds.c lib/ssd1306.c)
 pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/pio_matrix.pio)
 
 pico_set_program_name(${PROJECT_NAME} "semafaro-inteligente-raspberry-pico-w")
@@ -66,6 +66,7 @@ target_link_libraries(${PROJECT_NAME}
         hardware_pwm
         hardware_pio
         hardware_clocks
+        hardware_i2c
         )
 
 pico_add_extra_outputs(${PROJECT_NAME} )
