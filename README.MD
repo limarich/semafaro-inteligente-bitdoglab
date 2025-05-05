@@ -88,6 +88,7 @@ Exibe uma animação de boneco no display OLED SSD1306, com mensagens informativ
 
 ## 📂 Estrutura do Projeto
 
+```
 ├── main.c
 ├── lib/
 │ ├── buzzer.h / .c
@@ -96,6 +97,7 @@ Exibe uma animação de boneco no display OLED SSD1306, com mensagens informativ
 │ └── font.h
 ├── pio_matrix.pio
 ├── README.md
+```
 
 ---
 
