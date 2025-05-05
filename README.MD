@@ -94,6 +94,7 @@ Exibe uma animação de boneco no display OLED SSD1306, com mensagens informativ
 │ ├── buzzer.h / .c
 │ ├── leds.h / .c
 │ ├── ssd1306.h / .c
+| ├──FreeRTOSConfig.h
 │ └── font.h
 ├── pio_matrix.pio
 ├── README.md
