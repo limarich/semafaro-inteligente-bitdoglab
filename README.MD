@@ -104,7 +104,7 @@ Exibe uma animação de boneco no display OLED SSD1306, com mensagens informativ
 
 ## 📺 Demonstração
 
-- **Vídeo de demonstração**:
+- **Vídeo de demonstração**: [https://youtube.com/shorts/ba8qCB3CgZY]
 
 ---
 
