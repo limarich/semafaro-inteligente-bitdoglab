@@ -108,7 +108,7 @@ pixel handle_color(color_options color, float intensity)
     return pixel_color;
 }
 
-void draw_traffic_light(PIO pio, uint sm, color_options color)
+void draw_traffic_light(PIO pio, uint sm, color_options color, bool night_mode)
 {
 
     pixel pixel_color = handle_color(color, 1);
@@ -124,6 +124,12 @@ void draw_traffic_light(PIO pio, uint sm, color_options color)
         black, gray, yellow, gray, black,
         black, gray, red, gray, black,
         black, gray, gray, gray, black};
+
+    if (night_mode)
+    { // se estiver no modo noturno mantem o led vermelho e verde apagado
+        matrix[17].intensity = 0;
+        matrix[7].intensity = 0;
+    }
 
     if (color == RED)
     {

@@ -54,6 +54,6 @@ void draw_pio(pixel *draw, PIO pio, uint sm);
 void test_matrix(PIO pio, uint sm);
 
 // desenha um semáfaro com a cor indicada
-void draw_traffic_light(PIO pio, uint sm, color_options color);
+void draw_traffic_light(PIO pio, uint sm, color_options color, bool night_mode);
 
 #endif

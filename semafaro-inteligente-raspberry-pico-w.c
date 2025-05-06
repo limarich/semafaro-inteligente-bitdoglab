@@ -169,24 +169,25 @@ void vTrafficLightTask(void *pvParameters)
         switch (light_state)
         {
         case GREEN_LIGHT:
-            draw_traffic_light(pio, sm, GREEN);
+            vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(50));
+            draw_traffic_light(pio, sm, GREEN, false);
 
             break;
 
         case YELLOW_LIGHT:
-            draw_traffic_light(pio, sm, YELLOW);
+            draw_traffic_light(pio, sm, YELLOW, false);
             break;
 
         case RED_LIGHT:
-            draw_traffic_light(pio, sm, RED);
+            draw_traffic_light(pio, sm, RED, false);
             break;
 
         case NIGHT_MODE:
-            draw_traffic_light(pio, sm, night_toggle ? YELLOW : BLACK);
+            draw_traffic_light(pio, sm, night_toggle ? YELLOW : BLACK, true);
             break;
 
         default:
-            draw_traffic_light(pio, sm, BLACK);
+            draw_traffic_light(pio, sm, BLACK, false);
             break;
         }
         // EVITA USO EXCESSIVO DE CPU
