@@ -19,6 +19,7 @@ void draw_pio(pixel *draw, PIO pio, uint sm)
     }
 }
 
+// testa a matriz de leds
 void test_matrix(PIO pio, uint sm)
 {
     frame test_frame, black_frame;
@@ -36,6 +37,7 @@ void test_matrix(PIO pio, uint sm)
     sleep_ms(50);
 }
 
+// determina o padrão do pixel baseado na cor passada
 pixel handle_color(color_options color, float intensity)
 {
     pixel pixel_color = {0, 0, 0};
@@ -108,6 +110,18 @@ pixel handle_color(color_options color, float intensity)
     return pixel_color;
 }
 
+/*
+    Desenha o padrão do semáforo na matriz de leds baseado no valor da cor(color_option) informado e da flag night mode
+
+    color red -> sinal vermelho
+    color yellow -> sinal amarelo
+    color green -> sinal verde
+
+    se a flag night mode não for informada, todas as cores ficarão acesas, com baixa intensidade,
+    exceto a cor escolhida que terá a luminosidade máxima
+
+    flag night mode -> apenas o sinal amarelo
+*/
 void draw_traffic_light(PIO pio, uint sm, color_options color, bool night_mode)
 {
 

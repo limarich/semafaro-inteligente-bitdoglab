@@ -17,7 +17,7 @@
 #define ledR 13               // pino do led vermelho
 #define ledG 11               // pino do led verde
 #define signalDelay 1000      // tempo que o led fica aceso
-#define BUTTON_A 5            // BOTÃO B para mudar o modo do semáfaro
+#define BUTTON_A 5            // BOTÃO B para mudar o modo do semáforo
 #define BUTTON_B 6            // BOTÃO A para desligar o beep
 #define DEBOUNCE_MS 200       // intervalo minimo de 200ms para o debounce
 #define BUZZER_A 10           // PORTA DO BUZZER A
@@ -28,7 +28,7 @@
 #define I2C_SCL 15            // PINO DO SCL
 #define endereco 0x3C         // ENDEREÇO
 
-// controle do modo do semáfaro
+// controle do modo do semáforo
 typedef enum
 {
     GREEN_LIGHT,
@@ -36,7 +36,7 @@ typedef enum
     RED_LIGHT,
     NIGHT_MODE
 } traffic_light_state;
-// estado do semáfaro
+// estado do semáforo
 volatile traffic_light_state light_state = GREEN_LIGHT;
 // controla se o buzzer já tocou após mudar
 volatile bool buzzer_already_played = false;
@@ -56,7 +56,7 @@ void PIO_setup(PIO *pio, uint *sm);
 // inicializa o display
 void ssd_setup();
 
-// controla a cor do semáfaro
+// controla a cor do semáforo
 void vTrafficLightControllerTask(void *pvParameters)
 {
     // Marca o tempo atual para controle do atraso periódico
@@ -74,7 +74,7 @@ void vTrafficLightControllerTask(void *pvParameters)
             continue;
         }
 
-        // MUDA O VALOR DO ESTADO DO SEMÁFARO
+        // MUDA O VALOR DO ESTADO DO semáforo
         // SEMPRE QUE MUDAR O ESTADO O BUZZER É LIBERADO PARA TOCAR
         light_state = GREEN_LIGHT;
         buzzer_already_played = false;
@@ -87,7 +87,7 @@ void vTrafficLightControllerTask(void *pvParameters)
         if (light_state == NIGHT_MODE)
             continue;
 
-        // MUDA O VALOR DO ESTADO DO SEMÁFARO
+        // MUDA O VALOR DO ESTADO DO semáforo
         light_state = YELLOW_LIGHT;
         buzzer_already_played = false;
 
@@ -98,7 +98,7 @@ void vTrafficLightControllerTask(void *pvParameters)
         if (light_state == NIGHT_MODE)
             continue;
 
-        // MUDA O VALOR DO ESTADO DO SEMÁFARO
+        // MUDA O VALOR DO ESTADO DO semáforo
         light_state = RED_LIGHT;
         buzzer_already_played = false;
 
@@ -109,6 +109,13 @@ void vTrafficLightControllerTask(void *pvParameters)
 }
 
 // controla o led RGB
+/*
+muda a cor do led baseado no valor do estado global light_state
+GREEN_LIGHT -> led verde aceso
+YELLOW_LIGHT -> led verde e vermelho aceso
+RED_LIGHT -> led vermelho aceso
+NIGHT_MODE -> led verde e vermelho aceso quando o estado global night_toggle mudar para true
+*/
 void vLedTask(void *pvParameters)
 {
     // INICIALIZA OS PINOS DO LED RBG
@@ -123,7 +130,7 @@ void vLedTask(void *pvParameters)
     while (1)
     {
 
-        // CHAVEAMENTO DA COR EXIBIDA DO LED BASEADO NO ESTADO DO SEMÁFARO
+        // CHAVEAMENTO DA COR EXIBIDA DO LED BASEADO NO ESTADO DO semáforo
         switch (light_state)
         {
         case GREEN_LIGHT:
@@ -157,7 +164,14 @@ void vLedTask(void *pvParameters)
     }
 }
 
-// desenho do semáfaro na matriz de leds
+// desenho do semáforo na matriz de leds
+/*
+muda a cor do led baseado no valor do estado global light_state
+GREEN_LIGHT -> animação de sinal verde
+YELLOW_LIGHT -> animação de sinal amarelo
+RED_LIGHT -> animação de sinal vermelho
+NIGHT_MODE -> animação do modo noturno
+*/
 void vTrafficLightTask(void *pvParameters)
 {
     // Marca o tempo atual para controle do atraso periódico
@@ -165,7 +179,7 @@ void vTrafficLightTask(void *pvParameters)
 
     while (1)
     {
-        // CHAVEAMENTO DA ANIMACÃO DO SEMÁFARO EXIBIDA NA MATRIZ DE LEDS BASEADO NO ESTADO DO SEMÁFARO
+        // CHAVEAMENTO DA ANIMACÃO DO semáforo EXIBIDA NA MATRIZ DE LEDS BASEADO NO ESTADO DO semáforo
         switch (light_state)
         {
         case GREEN_LIGHT:
@@ -196,6 +210,13 @@ void vTrafficLightTask(void *pvParameters)
 }
 
 // task para o aviso sonoro
+/*
+feedback sonoro controlado pelo estado global light_state e pela flag buzzer_already_played que só permite tocar uma vez a cada estado do modo normal
+GREEN_LIGHT -> toque por 1s
+YELLOW_LIGHT -> toque intermitente
+RED_LIGHT -> toque por 0.5s
+NIGHT_MODE -> toque longo a cada 2s
+*/
 void vBuzzerTask(void *pvParameters)
 {
     // INCIALIZA OS BUZZERS
@@ -209,8 +230,8 @@ void vBuzzerTask(void *pvParameters)
             // TOCA UM BEEP A CADA 2s
             if (light_state == NIGHT_MODE)
             {
-                buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 200); // 200ms
-                vTaskDelay(pdMS_TO_TICKS(1800));             // 2s total
+                buzzer_pwm(BUZZER_A, BUZZER_FREQUENCY, 1000); // 1000ms
+                vTaskDelay(pdMS_TO_TICKS(1000));              // 2s total
                 continue;
             }
 
@@ -226,7 +247,7 @@ void vBuzzerTask(void *pvParameters)
                 break;
 
             case YELLOW_LIGHT:
-                // TOCA BEEPS INTERMITENTES ATÉ MUDAR DE COR NO SEMÁFARO
+                // TOCA BEEPS INTERMITENTES ATÉ MUDAR DE COR NO semáforo
                 if (!buzzer_already_played)
                 {
                     // Aguarda 100ms para garantir que a luz amarela já esteja visível
@@ -259,6 +280,12 @@ void vBuzzerTask(void *pvParameters)
 }
 
 // task em pooling para leitura do botão
+/*
+polling de leitura com debounce de 200ms dos botoes A e B
+Botão A -> muda a configuração do modo
+Botão B -> desabilita o som do buzzer
+
+*/
 void vButtonTask(void *pvParameters)
 {
     // configuração do botão A
@@ -278,7 +305,7 @@ void vButtonTask(void *pvParameters)
         bool current_a_state = gpio_get(BUTTON_A);
         bool current_b_state = gpio_get(BUTTON_B);
 
-        // Botão A PRESSIONADO MODIFICA O MODO DO SEMÁFARO
+        // Botão A PRESSIONADO MODIFICA O MODO DO semáforo
         if (!current_a_state && last_button_a_state)
         {
             if (light_state == NIGHT_MODE)
@@ -307,7 +334,13 @@ void vButtonTask(void *pvParameters)
     }
 }
 
-// Task para desenhar no display
+// Task para desenhar no display para o pedestre
+// feedback visual controlado pelo estado global light_state
+// GREEN_LIGHT -> animação do pedestre andando e a mensagem para andar
+// YELLOW_LIGHT -> animação do pedestre parado e a mensagem para ter anteção
+// RED_LIGHT -> animação do pedestre parado e a mensagem para esperar
+// NIGHT_MODE -> mensagem de atenção e display piscando
+
 void vDisplayAnimationTask(void *pvParameters)
 {
     float arm_rotate = 0; // CONTROLA A ROTAÇÃO DOS BRAÇOS NA ANIMAÇÃO

@@ -217,6 +217,7 @@ void ssd1306_draw_string(ssd1306_t *ssd, const char *str, uint8_t x, uint8_t y)
 
 #include <math.h>
 
+// desenha um retangulo que pode ser rotacionado em uma certa angulação
 void ssd1306_rotated_rect_angle(ssd1306_t *ssd, int cx, int cy, int w, int h, double angle_deg, bool value)
 {
     // Converte o ângulo para radianos
